@@ -65,7 +65,7 @@ export default class App extends Component {
     console.log('------------------------------------');
     console.log(value.toUpperCase());
     console.log('------------------------------------');
-    this.setState({ value: value.toUpperCase() });
+    this.setState({ value: value });
   }
 
   onChange = (event) => {

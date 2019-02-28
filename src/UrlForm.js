@@ -9,7 +9,7 @@ const UrlForm = (props) => {
         <Input invalid bsSize="lg" id="rss-url" type="text" name="rss-url" placeholder="https://" />
         <InputGroupAddon addonType="append">
           <Button color="primary" type="submit" outline={true} disabled={true}>
-            <Spinner size="sm"/>
+            <Spinner size="sm" />
             Add
           </Button>
         </InputGroupAddon>

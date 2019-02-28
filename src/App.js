@@ -60,12 +60,34 @@ export default class App extends Component {
     };
   }
 
+  onChange = (event) => {
+    const { value } = event.target;
+    console.log('------------------------------------');
+    console.log(value.toUpperCase());
+    console.log('------------------------------------');
+    this.setState({ value: value.toUpperCase() });
+  }
+
+  onChange = (event) => {
+    console.log('------------------------------------');
+    console.log(event.target.value);
+    console.log('------------------------------------');
+  }
+
   render() {
+    const { form: { value, state, message } } = this.state;
+
     return (
       <Container className="mt-3">
         <Row>
           <Col>
-            <UrlForm />
+            <UrlForm
+              state={state}
+              value={value}
+              message={message}
+              onClick={this.onClick}
+              onChange={this.onChange}
+            />
           </Col>
         </Row>
         <Row>

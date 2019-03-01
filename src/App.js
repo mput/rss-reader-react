@@ -32,8 +32,8 @@ import UrlForm from './UrlForm';
 //   }, updateInterval);
 // };
 
-const CORSproxys = ['https://cors-anywhere.herokuapp.com/', 'https://cors.io/?'];
-const proxyUrl = url => `${sample(CORSproxys)}${url}`;
+const CORSProxies = ['https://cors-anywhere.herokuapp.com/', 'https://cors.io/?'];
+const proxyUrl = url => `${sample(CORSProxies)}${url}`;
 const fetchFeed = async (url) => {
   console.log(proxyUrl(url));
   const { data } = await axios.get(proxyUrl(url));
@@ -88,61 +88,51 @@ export default class App extends Component {
     super(props);
     this.state = {
       formValue: '',
+      formState: 'empty', // empty, valid, invalid, waiting
+      formMessage: '',
       channels: [],
       articles: [],
       activeFeed: null,
     };
-
-    this.formState = 'empty';
-    this.formMessage = '';
   }
-
 
   onChange = (event) => {
     const { value } = event.target;
-    this.chenkItput(value);
     this.setState({ formValue: value });
+    if (!value) {
+      this.setState({ formMessage: '', formState: 'empty' });
+      return;
+    }
+    const error = this.checkInput(value);
+    if (error) {
+      this.setState({ formMessage: error, formState: 'invalid' });
+    }
+    if (!error) {
+      this.setState({ formMessage: 'Looks good!', formState: 'valid' });
+    }
   }
 
   onSubmit = async (event) => {
     event.preventDefault();
     const { formValue } = this.state;
+    this.setState({ formState: 'waiting' });
     try {
       await this.addNewFeed(formValue);
-      this.formState = 'empty';
-      this.formMessage = '';
-      this.setState({ formValue: '' });
+      this.setState({ formValue: '', formMessage: '', formState: 'empty' });
     } catch (e) {
-
+      this.setState({ formMessage: e.message, formState: 'invalid' });
     }
   }
 
-  chenkItput(input) {
+  checkInput(url) {
     const { channels } = this.state;
-    const validateURL = (checkUrl) => {
-      if (!validator.isURL(checkUrl)) {
-        return 'Not valid URL';
-      }
-      if (channels.find(({ url }) => url === checkUrl)) {
-        return 'URL already exist';
-      }
-      return false;
-    };
-
-    if (!input) {
-      this.formState = 'empty';
-      this.formMessage = '';
-      return;
+    if (!validator.isURL(url)) {
+      return 'Not valid URL';
     }
-    const error = validateURL(input);
-    if (error) {
-      this.formState = 'invalid';
-      this.formMessage = error;
+    if (channels.find(channel => channel.url === url)) {
+      return 'URL already exist';
     }
-    if (!error) {
-      this.formState = 'valid';
-      this.formMessage = 'Looks good!';
-    }
+    return false;
   }
 
   async addNewFeed(url) {
@@ -155,7 +145,7 @@ export default class App extends Component {
   }
 
   render() {
-    const { formValue } = this.state;
+    const { formValue, formState, formMessage } = this.state;
 
     return (
       <Container className="mt-3">
@@ -163,8 +153,8 @@ export default class App extends Component {
           <Col>
             <UrlForm
               value={formValue}
-              state={this.formState}
-              message={this.formMessage}
+              state={formState}
+              message={formMessage}
               onSubmit={this.onSubmit}
               onChange={this.onChange}
             />

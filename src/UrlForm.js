@@ -8,7 +8,7 @@ const UrlForm = ({ value, state, message, onChange, onSubmit }) => {
   let inputDisabled = false;
   let valid = false;
   let invalid = false;
-  let isWaiting = false;
+  let isSpinnerActive = false;
 
   switch (state) {
     case 'empty':
@@ -22,12 +22,12 @@ const UrlForm = ({ value, state, message, onChange, onSubmit }) => {
       btnDisabled = true;
       break;
     case 'waiting':
-      isWaiting = true;
+      isSpinnerActive = true;
       inputDisabled = true;
+      btnDisabled = true;
       break;
     default:
   }
-  console.log(valid, invalid, state);
 
   return (
     <div className="py-4">
@@ -47,7 +47,7 @@ const UrlForm = ({ value, state, message, onChange, onSubmit }) => {
         />
         <InputGroupAddon addonType="append">
           <Button color="primary" type="submit" outline disabled={btnDisabled}>
-            {isWaiting && <Spinner size="sm" />}
+            {isSpinnerActive && <Spinner size="sm" />}
             Add
           </Button>
         </InputGroupAddon>

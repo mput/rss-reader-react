@@ -1,12 +1,12 @@
 language: node_js
 
 node_js:
-  - v11.3.0
+  - stable
 script:
   # - make lint
   - npm run build
 deploy:
   provider: surge
-  project: ./dist/
+  project: ./build/
   domain: rss-hex-react.surge.sh
   skip_cleanup: true

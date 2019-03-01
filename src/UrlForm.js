@@ -19,6 +19,7 @@ const UrlForm = ({ value, state, message, onChange, onSubmit }) => {
       break;
     case 'invalid':
       invalid = true;
+      btnDisabled = true;
       break;
     case 'waiting':
       isWaiting = true;
@@ -26,11 +27,12 @@ const UrlForm = ({ value, state, message, onChange, onSubmit }) => {
       break;
     default:
   }
+  console.log(valid, invalid, state);
 
   return (
     <div className="py-4">
-      <Label className="display-4 mb-3 ml-1" for={id}>Add RSS:</Label>
-      <InputGroup onSubmit={onSubmit}>
+      <Label className="display-4 mb-3 ml-1" htmlFor={id}>Add RSS:</Label>
+      <InputGroup tag="form" onSubmit={onSubmit}>
         <Input
           valid={valid}
           invalid={invalid}
@@ -49,7 +51,7 @@ const UrlForm = ({ value, state, message, onChange, onSubmit }) => {
             Add
           </Button>
         </InputGroupAddon>
-        <FormFeedback>
+        <FormFeedback valid={valid}>
           {message}
         </FormFeedback>
       </InputGroup>

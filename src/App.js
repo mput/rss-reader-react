@@ -3,7 +3,7 @@
 /* eslint-disable react/prefer-stateless-function */
 /* eslint-disable no-unused-vars */
 import React, { Component } from 'react';
-import { Container, Row, Col, Button, ListGroup, ListGroupItem } from 'reactstrap';
+import { Container, Row, Col, Button, ListGroup, ListGroupItem, Modal, ModalHeader, ModalBody, ModalFooter } from 'reactstrap';
 import axios from 'axios';
 import validator from 'validator';
 import { uniqueId, sample } from 'lodash';
@@ -67,16 +67,40 @@ const Channel = ({ title, description, active, onClick, onDelete }) => {
   );
 };
 
-const Article= ({ title, link, onClick}) => {
+const Article = ({ title, description, link, onClick }) => {
   return (
     <ListGroupItem className="d-flex">
-      <Button type="button" color="primary" onClick={onClick} outline size="sm" className="mr-2 align-self-center">
+      <Button
+        type="button"
+        color="primary"
+        onClick={onClick}
+        outline
+        size="sm"
+        className="mr-2 align-self-center"
+      >
         Preview
       </Button>
       <a href={link} rel="noopener noreferrer" target="_blank">{title}</a>
     </ListGroupItem>
   );
 };
+
+const ModalPreview = ({header, body, link, isOpen, toggle}) => (
+  <Modal isOpen={isOpen} toggle={toggle}>
+    <ModalHeader toggle={toggle}>
+      {header}
+    </ModalHeader>
+    <ModalBody>
+      {body}
+    </ModalBody>
+    <ModalFooter>
+      <Button type="button" color="secondary" onClick={toggle}>Close</Button>
+      <a href={link || '#'} role="button" className="btn btn-primary open-link" rel="noopener noreferrer" target="_blank">
+        Open link in new window
+      </a>
+    </ModalFooter>
+  </Modal>
+);
 
 
 export default class App extends Component {
@@ -89,6 +113,7 @@ export default class App extends Component {
       channels: [],
       articles: [],
       activeFeed: null,
+      articleToPreview: null,
     };
   }
 
@@ -147,8 +172,12 @@ export default class App extends Component {
   }
 
   onClickPreviewArticle = (title, description, link) => (event) => {
-    console.log(title, link);
+    this.setState({ articleToPreview: { title, description, link } });
   };
+
+  onClickCloseModal = () => {
+    this.setState({ articleToPreview: null });
+  }
 
   checkInput(url) {
     const { channels } = this.state;
@@ -187,7 +216,10 @@ export default class App extends Component {
   }
 
   render() {
-    const { formValue, formState, formMessage, channels, activeFeed, articles } = this.state;
+    const { formValue, formState, formMessage, channels,
+      activeFeed, articles, articleToPreview } = this.state;
+
+    const isModalOpen = !!articleToPreview;
 
     const channelsElements = channels.map(({ title, description, id }) => (
       <Channel
@@ -233,20 +265,29 @@ export default class App extends Component {
     );
 
     return (
-      <Container className="mt-3">
-        <Row>
-          <Col>
-            <UrlForm
-              value={formValue}
-              state={formState}
-              message={formMessage}
-              onSubmit={this.onFromSubmit}
-              onChange={this.onFormChange}
-            />
-          </Col>
-        </Row>
-        {channels.length > 0 && channelRow }
-      </Container>
+      <>
+        <Container className="mt-3">
+          <Row>
+            <Col>
+              <UrlForm
+                value={formValue}
+                state={formState}
+                message={formMessage}
+                onSubmit={this.onFromSubmit}
+                onChange={this.onFormChange}
+              />
+            </Col>
+          </Row>
+          {channels.length > 0 && channelRow}
+        </Container>
+        <ModalPreview
+          header={isModalOpen && articleToPreview.title}
+          body={isModalOpen && articleToPreview.description}
+          link={isModalOpen && articleToPreview.link}
+          isOpen={isModalOpen}
+          toggle={this.onClickCloseModal}
+        />
+      </>
     );
   }
 }

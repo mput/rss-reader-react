@@ -1,3 +1,4 @@
+/* eslint-disable react/sort-comp */
 /* eslint-disable react/no-unused-state */
 /* eslint-disable react/prefer-stateless-function */
 /* eslint-disable no-unused-vars */
@@ -9,19 +10,6 @@ import { uniqueId, sample } from 'lodash';
 import parseRSS from './lib/parseRSS';
 import UrlForm from './UrlForm';
 
-// const addNewItems = (feed, items) => {
-//   const existingItems = state.items.filter(article => article.feedId === feed.id);
-//   const newArticles = items
-//     .filter(article => isNewItem(article, existingItems))
-//     .map(item => ({ ...item, feedId: feed.id }));
-//   if (newArticles.length > 0) {
-//     state.message = {
-//       counter: state.message.counter + 1,
-//       text: `Fetched ${newArticles.length} new items from <b>${feed.title}</b>`,
-//     };
-//     state.items = [...newArticles, ...state.items];
-//   }
-// };
 // const startUpdating = (feed) => {
 //   setTimeout(() => {
 //     fetchFeed(feed.url)
@@ -35,14 +23,14 @@ import UrlForm from './UrlForm';
 const CORSProxies = ['https://cors-anywhere.herokuapp.com/', 'https://cors.io/?'];
 const proxyUrl = url => `${sample(CORSProxies)}${url}`;
 const fetchFeed = async (url) => {
-  console.log(proxyUrl(url));
   const { data } = await axios.get(proxyUrl(url));
   return parseRSS(data);
 };
+const isNewItem = (maybeNew, oldItems) => !oldItems.find(item => item.guid === maybeNew.guid);
 
 const ChannelsList = (props) => {
   return (
-    <Col xs="12" md="6" className="pt-3">
+    <Col xs="12" md="5" className="pt-3">
       <h2 className="pl-4">Feeds:</h2>
       <ListGroup className="mt-4">
         {props.children}
@@ -62,22 +50,30 @@ const ArticlesList = (props) => {
   );
 };
 
-const Channel = (props) => {
+const Channel = ({ title, description, active, onClick, onDelete }) => {
+  const deleteBtn = (
+    <button type="button" className="close position-absolute" onClick={onDelete} style={{ top: '3px', right: '8px' }} aria-label="Close">
+      <span aria-hidden="true">&times;</span>
+    </button>
+  );
   return (
-    <ListGroupItem tag="a" action active href="#">
-      <p className="mb-1"><strong>title</strong></p>
-      <p className="mb-1">description</p>
+    <ListGroupItem onClick={onClick} action active={active}>
+      <div className="mr-1">
+        <p className="mb-1"><strong>{title}</strong></p>
+        {description && <p className="mb-1">{description}</p>}
+      </div>
+      {onDelete && deleteBtn}
     </ListGroupItem>
   );
 };
 
-const Article= (props) => {
+const Article= ({ title, link, onClick}) => {
   return (
     <ListGroupItem className="d-flex">
-      <Button type="button" color="primary" outline size="sm" className="mr-2 align-self-center">
+      <Button type="button" color="primary" onClick={onClick} outline size="sm" className="mr-2 align-self-center">
         Preview
       </Button>
-      <a href="#">Title</a>
+      <a href={link} rel="noopener noreferrer" target="_blank">{title}</a>
     </ListGroupItem>
   );
 };
@@ -96,7 +92,15 @@ export default class App extends Component {
     };
   }
 
-  onChange = (event) => {
+  async componentDidMount() {
+    const channelToStartWith = [
+      'http://lorem-rss.herokuapp.com/feed?unit=second&interval=30',
+      'https://habr.com/ru/rss/all/all/?fl=ru',
+    ];
+    Promise.all(channelToStartWith.map(channel => this.addNewFeed(channel).catch(console.log)));
+  }
+
+  onFormChange = (event) => {
     const { value } = event.target;
     this.setState({ formValue: value });
     if (!value) {
@@ -112,7 +116,7 @@ export default class App extends Component {
     }
   }
 
-  onSubmit = async (event) => {
+  onFromSubmit = async (event) => {
     event.preventDefault();
     const { formValue } = this.state;
     this.setState({ formState: 'waiting' });
@@ -123,6 +127,28 @@ export default class App extends Component {
       this.setState({ formMessage: e.message, formState: 'invalid' });
     }
   }
+
+  onClickMakeFeedActive = id => (event) => {
+    event.preventDefault();
+    this.setState({ activeFeed: id });
+  }
+
+  onClickDeleteFeed = id => (event) => {
+    const { channels, articles, activeFeed } = this.state;
+    this.setState({
+      channels: channels.filter(channel => channel.id !== id),
+      articles: articles.filter(article => article.feedId !== id),
+    });
+    if (id === activeFeed) {
+      this.setState({ activeFeed: null });
+    }
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  onClickPreviewArticle = (title, description, link) => (event) => {
+    console.log(title, link);
+  };
 
   checkInput(url) {
     const { channels } = this.state;
@@ -140,12 +166,71 @@ export default class App extends Component {
     const channel = { ...feed.channel, url, id: uniqueId('feed_') };
     const { channels } = this.state;
     this.setState({ channels: [channel, ...channels] });
-    // addNewItems(channel, feed.items);
+    this.addNewItems(channel, feed.items);
     // startUpdating(channel);
   }
 
+  addNewItems = (feed, items) => {
+    const { articles } = this.state;
+    const existingItems = articles.filter(article => article.feedId === feed.id);
+    const newArticles = items
+      .filter(article => isNewItem(article, existingItems))
+      .map(item => ({ ...item, feedId: feed.id }));
+    if (newArticles.length > 0) {
+      // state.message = {
+      //   counter: state.message.counter + 1,
+      //   text: `Fetched ${newArticles.length} new items from <b>${feed.title}</b>`,
+      // };
+      const updatedArticles = [...newArticles, ...articles];
+      this.setState({ articles: updatedArticles });
+    }
+  }
+
   render() {
-    const { formValue, formState, formMessage } = this.state;
+    const { formValue, formState, formMessage, channels, activeFeed, articles } = this.state;
+
+    const channelsElements = channels.map(({ title, description, id }) => (
+      <Channel
+        title={title}
+        description={description}
+        key={id}
+        active={(id === activeFeed)}
+        onClick={this.onClickMakeFeedActive(id)}
+        onDelete={this.onClickDeleteFeed(id)}
+      />
+    ));
+
+    const articlesElements = articles
+      .filter((({ feedId }) => {
+        if (!activeFeed) return true;
+        return feedId === activeFeed;
+      }))
+      .map(({ title, description, link, feedId, guid }) => {
+        return (
+          <Article
+            title={title}
+            link={link}
+            onClick={this.onClickPreviewArticle(title, description, link)}
+            key={`${feedId}+${guid}`}
+          />
+        );
+      });
+
+    const channelRow = (
+      <Row>
+        <ChannelsList>
+          <Channel
+            title="All feeds"
+            active={activeFeed === null}
+            onClick={this.onClickMakeFeedActive(null)}
+          />
+          {channelsElements}
+        </ChannelsList>
+        <ArticlesList>
+          {articlesElements}
+        </ArticlesList>
+      </Row>
+    );
 
     return (
       <Container className="mt-3">
@@ -155,20 +240,12 @@ export default class App extends Component {
               value={formValue}
               state={formState}
               message={formMessage}
-              onSubmit={this.onSubmit}
-              onChange={this.onChange}
+              onSubmit={this.onFromSubmit}
+              onChange={this.onFormChange}
             />
           </Col>
         </Row>
-        <Row>
-          <ChannelsList>
-            <Channel />
-          </ChannelsList>
-          <ArticlesList>
-            <Article />
-            <Article />
-          </ArticlesList>
-        </Row>
+        {channels.length > 0 && channelRow }
       </Container>
     );
   }

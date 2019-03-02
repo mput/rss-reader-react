@@ -3,22 +3,17 @@
 /* eslint-disable react/prefer-stateless-function */
 /* eslint-disable no-unused-vars */
 import React, { Component } from 'react';
-import { Container, Row, Col, Button, ListGroup, ListGroupItem, Modal, ModalHeader, ModalBody, ModalFooter } from 'reactstrap';
+import { Container, Row, Col } from 'reactstrap';
 import axios from 'axios';
 import validator from 'validator';
 import { uniqueId, sample } from 'lodash';
+
 import parseRSS from './lib/parseRSS';
 import UrlForm from './UrlForm';
+import ArticlesList from './ArticlesList';
+import ChannelsList from './ChannelsList';
+import ModalPreview from './ModalPreview';
 
-// const startUpdating = (feed) => {
-//   setTimeout(() => {
-//     fetchFeed(feed.url)
-//       .then(({ items }) => addNewItems(feed, items))
-//       .finally(() => {
-//         startUpdating(feed);
-//       });
-//   }, updateInterval);
-// };
 
 const CORSProxies = ['https://cors-anywhere.herokuapp.com/', 'https://cors.io/?'];
 const proxyUrl = url => `${sample(CORSProxies)}${url}`;
@@ -27,81 +22,6 @@ const fetchFeed = async (url) => {
   return parseRSS(data);
 };
 const isNewItem = (maybeNew, oldItems) => !oldItems.find(item => item.guid === maybeNew.guid);
-
-const ChannelsList = (props) => {
-  return (
-    <Col xs="12" md="5" className="pt-3">
-      <h2 className="pl-4">Feeds:</h2>
-      <ListGroup className="mt-4">
-        {props.children}
-      </ListGroup>
-    </Col>
-  );
-};
-
-const ArticlesList = (props) => {
-  return (
-    <Col className="pt-3">
-      <h2 className="pl-4">Articles:</h2>
-      <ListGroup flush>
-        {props.children}
-      </ListGroup>
-    </Col>
-  );
-};
-
-const Channel = ({ title, description, active, onClick, onDelete }) => {
-  const deleteBtn = (
-    <button type="button" className="close position-absolute" onClick={onDelete} style={{ top: '3px', right: '8px' }} aria-label="Close">
-      <span aria-hidden="true">&times;</span>
-    </button>
-  );
-  return (
-    <ListGroupItem onClick={onClick} action active={active}>
-      <div className="mr-1">
-        <p className="mb-1"><strong>{title}</strong></p>
-        {description && <p className="mb-1">{description}</p>}
-      </div>
-      {onDelete && deleteBtn}
-    </ListGroupItem>
-  );
-};
-
-const Article = ({ title, description, link, onClick }) => {
-  return (
-    <ListGroupItem className="d-flex">
-      <Button
-        type="button"
-        color="primary"
-        onClick={onClick}
-        outline
-        size="sm"
-        className="mr-2 align-self-center"
-      >
-        Preview
-      </Button>
-      <a href={link} rel="noopener noreferrer" target="_blank">{title}</a>
-    </ListGroupItem>
-  );
-};
-
-const ModalPreview = ({header, body, link, isOpen, toggle}) => (
-  <Modal isOpen={isOpen} toggle={toggle}>
-    <ModalHeader toggle={toggle}>
-      {header}
-    </ModalHeader>
-    <ModalBody>
-      {body}
-    </ModalBody>
-    <ModalFooter>
-      <Button type="button" color="secondary" onClick={toggle}>Close</Button>
-      <a href={link || '#'} role="button" className="btn btn-primary open-link" rel="noopener noreferrer" target="_blank">
-        Open link in new window
-      </a>
-    </ModalFooter>
-  </Modal>
-);
-
 
 export default class App extends Component {
   constructor(props) {
@@ -115,11 +35,13 @@ export default class App extends Component {
       activeFeed: null,
       articleToPreview: null,
     };
+
+    this.channelsTimeOutIds = {};
   }
 
   async componentDidMount() {
     const channelToStartWith = [
-      'http://lorem-rss.herokuapp.com/feed?unit=second&interval=30',
+      'http://lorem-rss.herokuapp.com/feed?unit=second&interval=4',
       'https://habr.com/ru/rss/all/all/?fl=ru',
     ];
     Promise.all(channelToStartWith.map(channel => this.addNewFeed(channel).catch(console.log)));
@@ -160,6 +82,9 @@ export default class App extends Component {
 
   onClickDeleteFeed = id => (event) => {
     const { channels, articles, activeFeed } = this.state;
+    clearTimeout(this.channelsTimeOutIds[id]);
+    delete this.channelsTimeOutIds[id];
+
     this.setState({
       channels: channels.filter(channel => channel.id !== id),
       articles: articles.filter(article => article.feedId !== id),
@@ -196,7 +121,7 @@ export default class App extends Component {
     const { channels } = this.state;
     this.setState({ channels: [channel, ...channels] });
     this.addNewItems(channel, feed.items);
-    // startUpdating(channel);
+    this.startUpdating(channel);
   }
 
   addNewItems = (feed, items) => {
@@ -215,6 +140,20 @@ export default class App extends Component {
     }
   }
 
+  startUpdating = (feed) => {
+    const timeoutId = setTimeout(async () => {
+      console.log(`${timeoutId} Updating feed ${feed.title}`);
+      console.log(this.channelsTimeOutIds);
+      const { items } = await fetchFeed(feed.url);
+      try {
+        this.addNewItems(feed, items);
+      } finally {
+        this.startUpdating(feed);
+      }
+    }, 5000);
+    this.channelsTimeOutIds[feed.id] = timeoutId;
+  };
+
   render() {
     const { formValue, formState, formMessage, channels,
       activeFeed, articles, articleToPreview } = this.state;
@@ -222,7 +161,7 @@ export default class App extends Component {
     const isModalOpen = !!articleToPreview;
 
     const channelsElements = channels.map(({ title, description, id }) => (
-      <Channel
+      <ChannelsList.Channel
         title={title}
         description={description}
         key={id}
@@ -239,7 +178,7 @@ export default class App extends Component {
       }))
       .map(({ title, description, link, feedId, guid }) => {
         return (
-          <Article
+          <ArticlesList.Item
             title={title}
             link={link}
             onClick={this.onClickPreviewArticle(title, description, link)}
@@ -251,7 +190,7 @@ export default class App extends Component {
     const channelRow = (
       <Row>
         <ChannelsList>
-          <Channel
+          <ChannelsList.Channel
             title="All feeds"
             active={activeFeed === null}
             onClick={this.onClickMakeFeedActive(null)}

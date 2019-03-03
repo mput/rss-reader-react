@@ -1,0 +1,13 @@
+$primary:       #008cba !default;
+$secondary:     #eee !default;
+$success:       #43ac6a !default;
+
+
+@import "~bootstrap/scss/bootstrap";
+
+
+.modal img {
+  max-width: 80%;
+  display: block;
+  margin: 0 auto;
+}

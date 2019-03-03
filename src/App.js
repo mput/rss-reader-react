@@ -7,12 +7,14 @@ import { Container, Row, Col } from 'reactstrap';
 import axios from 'axios';
 import validator from 'validator';
 import { uniqueId, sample } from 'lodash';
+import { TransitionGroup, CSSTransition } from 'react-transition-group';
 
 import parseRSS from './lib/parseRSS';
 import UrlForm from './UrlForm';
 import ArticlesList from './ArticlesList';
 import ChannelsList from './ChannelsList';
 import ModalPreview from './ModalPreview';
+import Toast from './Toast';
 
 
 const CORSProxies = ['https://cors-anywhere.herokuapp.com/', 'https://cors.io/?'];
@@ -34,14 +36,16 @@ export default class App extends Component {
       articles: [],
       activeFeed: null,
       articleToPreview: null,
+      alerts: [],
     };
 
     this.channelsTimeOutIds = {};
+    this.updateInterval = 8000;
   }
 
   async componentDidMount() {
     const channelToStartWith = [
-      'http://lorem-rss.herokuapp.com/feed?unit=second&interval=4',
+      'http://lorem-rss.herokuapp.com/feed?unit=second&interval=5',
       'https://habr.com/ru/rss/all/all/?fl=ru',
     ];
     Promise.all(channelToStartWith.map(channel => this.addNewFeed(channel).catch(console.log)));
@@ -82,9 +86,7 @@ export default class App extends Component {
 
   onClickDeleteFeed = id => (event) => {
     const { channels, articles, activeFeed } = this.state;
-    clearTimeout(this.channelsTimeOutIds[id]);
-    delete this.channelsTimeOutIds[id];
-
+    this.stopFeedUpdate(id);
     this.setState({
       channels: channels.filter(channel => channel.id !== id),
       articles: articles.filter(article => article.feedId !== id),
@@ -96,12 +98,29 @@ export default class App extends Component {
     event.stopPropagation();
   }
 
-  onClickPreviewArticle = (title, description, link) => (event) => {
+  onClickPreviewArticle = (title, description, link) => () => {
     this.setState({ articleToPreview: { title, description, link } });
   };
 
   onClickCloseModal = () => {
     this.setState({ articleToPreview: null });
+  }
+
+  onClickRemoveAlert = id => () => this.removeAlert(id);
+
+  showAlert({ subHeader, message, header = 'RSS reader', duration = 5000 }) {
+    const { alerts } = this.state;
+    const id = uniqueId('alert-');
+    this.setState({ alerts: [...alerts, { header, subHeader, message, id, duration }] });
+    setTimeout(() => {
+      this.removeAlert(id);
+    }, duration);
+  }
+
+  removeAlert = (id) => {
+    const { alerts } = this.state;
+    const filteredAlerts = alerts.filter(alert => alert.id !== id);
+    this.setState({ alerts: filteredAlerts });
   }
 
   checkInput(url) {
@@ -122,6 +141,13 @@ export default class App extends Component {
     this.setState({ channels: [channel, ...channels] });
     this.addNewItems(channel, feed.items);
     this.startUpdating(channel);
+    const message = (
+      <span>
+        <b>{channel.title}</b>
+        {' was added!'}
+      </span>
+    );
+    this.showAlert({ subHeader: 'New feed', message });
   }
 
   addNewItems = (feed, items) => {
@@ -131,10 +157,13 @@ export default class App extends Component {
       .filter(article => isNewItem(article, existingItems))
       .map(item => ({ ...item, feedId: feed.id }));
     if (newArticles.length > 0) {
-      // state.message = {
-      //   counter: state.message.counter + 1,
-      //   text: `Fetched ${newArticles.length} new items from <b>${feed.title}</b>`,
-      // };
+      const message = (
+        <span>
+          {`Fetched ${newArticles.length} new items from `}
+          <b>{feed.title}</b>
+        </span>
+      );
+      this.showAlert({ subHeader: 'update', message, duration: 10000 });
       const updatedArticles = [...newArticles, ...articles];
       this.setState({ articles: updatedArticles });
     }
@@ -142,21 +171,32 @@ export default class App extends Component {
 
   startUpdating = (feed) => {
     const timeoutId = setTimeout(async () => {
-      console.log(`${timeoutId} Updating feed ${feed.title}`);
-      console.log(this.channelsTimeOutIds);
       const { items } = await fetchFeed(feed.url);
       try {
         this.addNewItems(feed, items);
       } finally {
         this.startUpdating(feed);
       }
-    }, 5000);
+    }, this.updateInterval);
     this.channelsTimeOutIds[feed.id] = timeoutId;
   };
 
+  stopFeedUpdate(feedId) {
+    clearTimeout(this.channelsTimeOutIds[feedId]);
+    delete this.channelsTimeOutIds[feedId];
+  }
+
   render() {
-    const { formValue, formState, formMessage, channels,
-      activeFeed, articles, articleToPreview } = this.state;
+    const {
+      formValue,
+      formState,
+      formMessage,
+      channels,
+      activeFeed,
+      articles,
+      articleToPreview,
+      alerts,
+    } = this.state;
 
     const isModalOpen = !!articleToPreview;
 
@@ -170,22 +210,19 @@ export default class App extends Component {
         onDelete={this.onClickDeleteFeed(id)}
       />
     ));
-
     const articlesElements = articles
       .filter((({ feedId }) => {
         if (!activeFeed) return true;
         return feedId === activeFeed;
       }))
-      .map(({ title, description, link, feedId, guid }) => {
-        return (
-          <ArticlesList.Item
-            title={title}
-            link={link}
-            onClick={this.onClickPreviewArticle(title, description, link)}
-            key={`${feedId}+${guid}`}
-          />
-        );
-      });
+      .map(({ title, description, link, feedId, guid }) => (
+        <ArticlesList.Item
+          title={title}
+          link={link}
+          onClick={this.onClickPreviewArticle(title, description, link)}
+          key={`${feedId}+${guid}`}
+        />
+      ));
 
     const channelRow = (
       <Row>
@@ -226,6 +263,18 @@ export default class App extends Component {
           isOpen={isModalOpen}
           toggle={this.onClickCloseModal}
         />
+        <Toast>
+          {alerts.map(({ header, subHeader, message, id, ...other }) => (
+            <Toast.Item
+              key={id}
+              header={header}
+              subHeader={subHeader}
+              message={message}
+              toggle={this.onClickRemoveAlert(id)}
+              {...other}
+            />
+          ))}
+        </Toast>
       </>
     );
   }
